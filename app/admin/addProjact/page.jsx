@@ -142,7 +142,7 @@ const Page = () => {
           description: '',
           category: 'Startup',
           author: 'Tarek',
-          authorImg: '/Asstes/profile_icon.png'
+          authorImg: 'https://res.cloudinary.com/dpfrffp6j/image/upload/v1760210072/blog_images/g5c8fquym9co37kdn6rt.jpg'
         });
         setImage(null);
         setImagePreview(null);

@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { v2 as cloudinary } from "cloudinary";
 import { mongoUrl } from "@/lib/mongodb";
+import BlogModel from "@/lib/model/blogModel";
 
-// Cloudinary config
+
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
@@ -11,7 +12,7 @@ cloudinary.config({
 
 export async function POST(req) {
   try {
-    // এনভায়রনমেন্ট ভেরিয়েবল চেক
+    
     if (!process.env.CLOUDINARY_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
       console.error("Missing Cloudinary environment variables");
       return NextResponse.json({ 
@@ -28,21 +29,21 @@ export async function POST(req) {
     const author = formData.get("author");
     const authorImg = formData.get("authorImg");
 
-    // ইমেজ ভ্যালিডেশন
+   
     if (!image || typeof image === "string") {
       return NextResponse.json({ error: "No image provided" }, { status: 400 });
     }
 
-    // ইমেজ সাইজ চেক
-    const maxSize = 5 * 1024 * 1024; // 5MB
+ 
+    const maxSize = 5 * 1024 * 1024; 
     if (image.size > maxSize) {
       return NextResponse.json({ error: "Image size exceeds 5MB limit" }, { status: 400 });
     }
 
-    // Buffer তৈরি
+   
     const buffer = Buffer.from(await image.arrayBuffer());
 
-    // ক্লাউডিনারিতে আপলোড
+  
     let result;
     try {
       result = await new Promise((resolve, reject) => {
@@ -68,7 +69,7 @@ export async function POST(req) {
       }, { status: 500 });
     }
 
-    // মঙ্গোডিবি সংযোগ
+  
     let db;
     try {
       db = await mongoUrl();
@@ -82,7 +83,7 @@ export async function POST(req) {
       }, { status: 500 });
     }
 
-    // মঙ্গোডিবিতে ডাটা সেভ
+
     try {
       const blogs = db.collection("blogs");
       const insertResult = await blogs.insertOne({
@@ -113,4 +114,46 @@ export async function POST(req) {
       error: "An unexpected error occurred" 
     }, { status: 500 });
   }
+}
+
+
+import { MongoClient } from 'mongodb';
+
+export async function GET(req) {
+
+  try {
+    // Check environment variable
+    if (!process.env.MONGO_DB_URL) {
+      console.error("Missing MongoDB environment variable");
+      return NextResponse.json({ 
+        error: "Server configuration error" 
+      }, { status: 500 });
+    }
+
+    // Connect to MongoDB
+    const client = new MongoClient(process.env.MONGO_DB_URL);
+    await client.connect();
+    const db = client.db('test'); // Explicit database name
+    const collection = db.collection('blogs'); // Explicit collection name
+
+    // Fetch all blogs sorted by newest first
+    const blogs = await collection
+      .find({})
+      .sort({ createdAt: -1 })
+      .toArray();
+    
+    return NextResponse.json({
+      success: true,
+      blogs: blogs,
+      count: blogs.length // Include document count
+    });
+    
+  } catch (error) {
+    console.error("Error fetching blogs:", error);
+    return NextResponse.json({ 
+      error: "Failed to fetch blogs",
+      details: error.message 
+    }, { status: 500 });
+  }
+  
 }

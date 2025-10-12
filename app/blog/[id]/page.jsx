@@ -1,16 +1,17 @@
 'use client'
 
-import { assets, blog_data } from '@/Asstes/assets';
+import { assets } from '@/Asstes/assets';
 import Footer from '@/Components/Footer';
 import Image from 'next/image';
 import Link from 'next/link';
 import React, { use, useEffect, useState } from 'react';
+import axios from 'axios';
 
 const Page = ({ params }) => {
-    const { id } = use(params); 
-
+    const { id } = use(params);
     const [data, setData] = useState(null);
     const [relatedPosts, setRelatedPosts] = useState([]);
+    const [loading, setLoading] = useState(true);
     const [comments, setComments] = useState([
         { id: 1, name: "Alex Johnson", text: "Great article! Really helped me understand the topic better.", time: "2 hours ago" },
         { id: 2, name: "Sarah Williams", text: "I've been looking for this information everywhere. Thank you for sharing!", time: "1 day ago" },
@@ -19,17 +20,26 @@ const Page = ({ params }) => {
     const [newComment, setNewComment] = useState("");
 
     useEffect(() => {
-        // Find the current blog post
-        for (let i = 0; i < blog_data.length; i++) {
-            if (Number(id) === blog_data[i].id) {
-                setData(blog_data[i]);
-                break;
+        const fetchBlog = async () => {
+            try {
+                setLoading(true);
+                // নির্দিষ্ট ব্লগ ডেটা ফেচ করুন
+                const response = await axios.get(`/api/blog/${id}`);
+                setData(response.data.blog);
+                
+                // সম্পর্কিত পোস্ট ফেচ করুন
+                const allBlogsResponse = await axios.get('/api/blog');
+                const allBlogs = allBlogsResponse.data.blogs;
+                const related = allBlogs.filter(post => post._id !== id).slice(0, 3);
+                setRelatedPosts(related);
+            } catch (error) {
+                console.error("Error fetching blog:", error);
+            } finally {
+                setLoading(false);
             }
-        }
-        
-        // Find related posts (excluding current post)
-        const related = blog_data.filter(post => post.id !== Number(id)).slice(0, 3);
-        setRelatedPosts(related);
+        };
+
+        fetchBlog();
     }, [id]); 
 
     const handleAddComment = (e) => {
@@ -47,7 +57,28 @@ const Page = ({ params }) => {
         setNewComment("");
     };
 
-    return ( data? 
+    if (loading) {
+        return (
+            <div className="min-h-screen flex justify-center items-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-600"></div>
+            </div>
+        );
+    }
+
+    if (!data) {
+        return (
+            <div className="min-h-screen flex justify-center items-center">
+                <div className="text-center">
+                    <h1 className="text-2xl font-bold text-gray-900 mb-4">Blog not found</h1>
+                    <Link href="/" className="text-indigo-600 hover:text-indigo-800">
+                        Go back to home
+                    </Link>
+                </div>
+            </div>
+        );
+    }
+
+    return (
         <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
             {/* Header */}
             <div className="bg-white shadow-sm py-5 px-5 md:px-12 lg:px-28 sticky top-0 z-10">
@@ -78,14 +109,14 @@ const Page = ({ params }) => {
                         <div className='flex items-center space-x-3'>
                             <Image 
                                 className='border-2 border-white rounded-full shadow-md' 
-                                src={data.author_img} 
+                                src={data.authorImg} // এখানে author ফিল্ড ব্যবহার করুন
                                 width={60} 
                                 height={60} 
                                 alt=''
                             />
                             <div className="text-left">
-                                <p className='font-semibold text-gray-900'>{data.author}</p>
-                                <p className='text-sm text-gray-600'>Published on {new Date().toLocaleDateString()}</p>
+                                <p className='font-semibold text-gray-900'>{data.author}</p> {/* এখানে authorImg ফিল্ড ব্যবহার করুন */}
+                                <p className='text-sm text-gray-600'>Published on {new Date(data.createdAt).toLocaleDateString()}</p>
                             </div>
                         </div>
                         
@@ -224,12 +255,12 @@ const Page = ({ params }) => {
                             <div className='text-center mb-6'>
                                 <Image 
                                     className='mx-auto border-4 border-white rounded-full shadow-md mb-4' 
-                                    src={data.author_img} 
+                                    src={data.authorImg} // এখানে author ফিল্ড ব্যবহার করুন
                                     width={100} 
                                     height={100} 
                                     alt=''
                                 />
-                                <h3 className='text-xl font-bold text-gray-900 mb-1'>{data.author}</h3>
+                                <h3 className='text-xl font-bold text-gray-900 mb-1'>{data.author}</h3> {/* এখানে authorImg ফিল্ড ব্যবহার করুন */}
                                 <p className='text-gray-600 mb-4'>Content Writer & Blogger</p>
                                 <button className='bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-6 rounded-lg transition-colors w-full'>
                                     Follow
@@ -269,7 +300,7 @@ const Page = ({ params }) => {
                             <h3 className='text-xl font-bold text-gray-900 mb-6'>Related Posts</h3>
                             <div className='space-y-6'>
                                 {relatedPosts.map(post => (
-                                    <Link key={post.id} href={`/blog/${post.id}`} className='flex group'>
+                                    <Link key={post._id} href={`/blog/${post._id}`} className='flex group'>
                                         <div className='flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden mr-4'>
                                             <Image 
                                                 src={post.image} 
@@ -284,7 +315,7 @@ const Page = ({ params }) => {
                                                 {post.title}
                                             </h4>
                                             <p className='text-sm text-gray-500 mt-1'>
-                                                {new Date().toLocaleDateString()} • 3 min read
+                                                {new Date(post.createdAt).toLocaleDateString()} • 3 min read
                                             </p>
                                         </div>
                                     </Link>
@@ -297,7 +328,7 @@ const Page = ({ params }) => {
             
             <Footer/>
         </div>
-    : <></>);
+    );
 };
 
 export default Page;

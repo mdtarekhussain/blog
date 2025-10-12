@@ -1,58 +1,81 @@
 "use Client"
-import { blog_data } from '@/Asstes/assets';
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useMemo } from 'react';
 import BlogItem from './BlogItem';
+import axios from 'axios';
 
 const BlogList = () => {
     const [menu, setMenu] = useState('All');
     const [searchTerm, setSearchTerm] = useState('');
-    const [filteredBlogs, setFilteredBlogs] = useState([]);
+    const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
     const [visibleBlogs, setVisibleBlogs] = useState(6);
-    const [loading, setLoading] = useState(false);
-
-    // Filter blogs based on category and search term
-    useEffect(() => {
-        setLoading(true);
-        
-        // Simulate loading delay for better UX
-        const timer = setTimeout(() => {
-            let result = blog_data;
-            
-            // Filter by category
-            if (menu !== 'All') {
-                result = result.filter(item => item.category === menu);
-            }
-            
-            // Filter by search term
-            if (searchTerm) {
-                const term = searchTerm.toLowerCase();
-                result = result.filter(item => 
-                    item.title.toLowerCase().includes(term) || 
-                    item.description.toLowerCase().includes(term)
-                );
-            }
-            
-            setFilteredBlogs(result);
+    const [loading, setLoading] = useState(true);
+    const [blogs, setBlogs] = useState([]);
+    
+   
+    const fetchBlogs = async () => {
+        try {
+            setLoading(true);
+            const response = await axios.get('/api/blog');
+            setBlogs(response.data.blogs);
+            console.log("Fetched blogs:", response.data.blogs);
+        } catch (error) {
+            console.error("Error fetching blogs:", error);
+        } finally {
             setLoading(false);
+        }
+    };
+    
+    useEffect(() => {
+        fetchBlogs();
+    }, []);
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearchTerm(searchTerm);
         }, 300);
         
         return () => clearTimeout(timer);
-    }, [menu, searchTerm]);
+    }, [searchTerm]);
+    
 
-    // Load more blogs
+    const filteredBlogs = useMemo(() => {
+        if (blogs.length === 0) return [];
+        
+        let result = blogs;
+        
+
+        if (menu !== 'All') {
+            result = result.filter(item => 
+                item.category.toLowerCase() === menu.toLowerCase()
+            );
+        }
+        
+     
+        if (debouncedSearchTerm) {
+            const term = debouncedSearchTerm.toLowerCase();
+            result = result.filter(item => 
+                item.title.toLowerCase().includes(term) || 
+                item.description.toLowerCase().includes(term)
+            );
+        }
+        
+        return result;
+    }, [blogs, menu, debouncedSearchTerm]);
+
     const loadMoreBlogs = () => {
         setVisibleBlogs(prev => prev + 3);
     };
 
-    // Reset visible blogs when filters change
+   
     useEffect(() => {
         setVisibleBlogs(6);
-    }, [menu, searchTerm]);
+    }, [menu, debouncedSearchTerm]);
 
     return (
         <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white py-12 px-5 md:px-12 lg:px-28">
             <div className="max-w-7xl mx-auto">
-                {/* Header */}
+              
                 <div className="text-center mb-16">
                     <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">Explore Our Blog</h1>
                     <p className="text-lg text-gray-600 max-w-2xl mx-auto">
@@ -60,7 +83,7 @@ const BlogList = () => {
                     </p>
                 </div>
 
-                {/* Search Bar */}
+              
                 <div className="max-w-2xl mx-auto mb-12">
                     <div className="relative">
                         <input
@@ -78,9 +101,9 @@ const BlogList = () => {
                     </div>
                 </div>
 
-                {/* Category Filters */}
+             
                 <div className="flex flex-wrap justify-center gap-3 mb-16">
-                    {['All', 'Technology', 'Startup', 'LifeStyle'].map((category) => (
+                    {['All', 'Technology', 'Startup', 'Lifestyle'].map((category) => (
                         <button
                             key={category}
                             onClick={() => setMenu(category)}
@@ -95,7 +118,7 @@ const BlogList = () => {
                     ))}
                 </div>
 
-                {/* Results Info */}
+              
                 <div className="flex justify-between items-center mb-8">
                     <p className="text-gray-600">
                         {filteredBlogs.length > 0 
@@ -110,23 +133,23 @@ const BlogList = () => {
                     </div>
                 </div>
 
-                {/* Loading State */}
+                
                 {loading ? (
                     <div className="flex justify-center items-center h-64">
                         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-600"></div>
                     </div>
                 ) : (
                     <>
-                        {/* Blog Grid */}
+                        
                         {filteredBlogs.length > 0 ? (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                                {filteredBlogs.slice(0, visibleBlogs).map((item, index) => (
+                                {filteredBlogs.slice(0, visibleBlogs).map((item) => (
                                     <div 
-                                        key={index} 
+                                        key={item._id}
                                         className="transform transition-all duration-500 hover:-translate-y-2"
                                     >
                                         <BlogItem 
-                                            id={item.id} 
+                                            id={item._id} 
                                             image={item.image} 
                                             title={item.title} 
                                             description={item.description} 
@@ -163,7 +186,7 @@ const BlogList = () => {
                             </div>
                         )}
 
-                        {/* Load More Button */}
+                       
                         {visibleBlogs < filteredBlogs.length && (
                             <div className="text-center mt-16">
                                 <button 
