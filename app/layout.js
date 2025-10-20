@@ -3,7 +3,7 @@ import "./globals.css";
 import { AuthProvider } from "/lib/AuthContext";
 import { ToastContainer } from "react-toastify";
 // Fixed import path and named import
-
+import { SpeedInsights } from "@vercel/speed-insights/next"
 const outFit = Outfit({
   // variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -33,6 +33,7 @@ export default function RootLayout({ children }) {
           pauseOnHover
           theme="light"
         />
+         <SpeedInsights/>
         <AuthProvider>
           {children}
         </AuthProvider>

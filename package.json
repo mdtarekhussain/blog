@@ -8,6 +8,7 @@
     "start": "next start"
   },
   "dependencies": {
+    "@vercel/speed-insights": "^1.2.0",
     "axios": "^1.12.2",
     "bcryptjs": "^3.0.2",
     "browser-image-compression": "^2.0.2",
