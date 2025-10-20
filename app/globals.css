@@ -24,3 +24,25 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 } */
+.blog-content{
+  padding: 36px o;
+}
+.blog-content b{
+margin-bottom: 10px;
+font-weight: 500;
+}
+.blog-content h1{
+margin-bottom: 10px;
+font-weight: 600;
+font-size: 26px;
+}
+.blog-content h2{
+margin-bottom: 10px;
+font-weight: 600;
+font-size: 22px;
+}
+
+.blog-content p{
+margin-bottom: 10px;
+
+}

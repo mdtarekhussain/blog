@@ -1,11 +1,35 @@
 "use client"
-import { assets } from '@/Asstes/assets';
+import { useAuth } from "/lib/AuthContext";
+import { useRouter } from "next/navigation";
 import axios from 'axios';
 import Image from 'next/image';
 import React, { useState, useRef, useEffect } from 'react';
 import { toast } from 'react-toastify';
 
 const Page = () => {
+    const { user, loading } = useAuth();
+    const router = useRouter();
+  
+    useEffect(() => {
+      if (!loading) {
+        // যদি ইউজার না থাকে → login এ পাঠাও
+        if (!user) {
+          router.push("/login");
+        }
+        // যদি ইউজার থাকে কিন্তু অ্যাডমিন না হয় → home এ পাঠাও
+        else if (user.role !== "ADMIN") {
+          router.push("/");
+        }
+      }
+    }, [user, loading, router]);
+  
+    if (loading || !user || user.role !== "ADMIN") {
+      return (
+        <div className="flex justify-center items-center min-h-screen">
+          <p className="text-lg font-semibold">Checking admin access...</p>
+        </div>
+      );
+    }
   const [image, setImage] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [data, setData] = useState({
@@ -13,7 +37,8 @@ const Page = () => {
     description: '',
     category: 'Startup',
     author: 'Tarek',
-    authorImg: 'https://res.cloudinary.com/dpfrffp6j/image/upload/v1760210072/blog_images/g5c8fquym9co37kdn6rt.jpg'
+    authorImg: 'https://res.cloudinary.com/dpfrffp6j/image/upload/v1760210072/blog_images/g5c8fquym9co37kdn6rt.jpg',
+    status: 'draft' // Added status field with default value 'Draft'
   });
   const [isLoading, setIsLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -118,6 +143,7 @@ const Page = () => {
     formData.append('author', data.author);
     formData.append('authorImg', data.authorImg);
     formData.append('image', image);
+    formData.append('status', data.status); // Added status to form data
     
     try {
       const response = await axios.post('/api/blog', formData, {
@@ -142,7 +168,8 @@ const Page = () => {
           description: '',
           category: 'Startup',
           author: 'Tarek',
-          authorImg: 'https://res.cloudinary.com/dpfrffp6j/image/upload/v1760210072/blog_images/g5c8fquym9co37kdn6rt.jpg'
+          authorImg: 'https://res.cloudinary.com/dpfrffp6j/image/upload/v1760210072/blog_images/g5c8fquym9co37kdn6rt.jpg',
+          status: 'Draft' // Reset status to default
         });
         setImage(null);
         setImagePreview(null);
@@ -206,6 +233,30 @@ const Page = () => {
       default:
         return (
           <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+          </svg>
+        );
+    }
+  };
+
+  // স্ট্যাটাস আইকন
+  const getStatusIcon = (status) => {
+    switch(status) {
+      case 'Draft':
+        return (
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M2 4a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V4z" />
+          </svg>
+        );
+      case 'Published':
+        return (
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+          </svg>
+        );
+      default:
+        return (
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
             <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
           </svg>
         );
@@ -279,8 +330,12 @@ const Page = () => {
                 </svg>
               </div>
               <div className="ml-4">
-                <h3 className="text-lg font-medium text-green-800">Blog Published Successfully!</h3>
-                <p className="text-sm text-green-700 mt-1">Your blog has been published and is now live for everyone to read.</p>
+                <h3 className="text-lg font-medium text-green-800">Blog {data.status === 'Published' ? 'Published' : 'Saved as Draft'} Successfully!</h3>
+                <p className="text-sm text-green-700 mt-1">
+                  {data.status === 'Published' 
+                    ? 'Your blog has been published and is now live for everyone to read.' 
+                    : 'Your blog has been saved as draft and is not yet published.'}
+                </p>
                 <div className="mt-4">
                   <button
                     onClick={resetSuccess}
@@ -426,6 +481,33 @@ const Page = () => {
                   </div>
                 </div>
                 
+                {/* Status Select */}
+                <div className="mb-8">
+                  <label className="block text-lg font-medium text-gray-800 mb-2">Blog Status</label>
+                  <div className="grid grid-cols-2 gap-4">
+                    {['draft', 'published'].map((status) => (
+                      <button
+                        key={status}
+                        type="button"
+                        onClick={() => setData({...data, status})}
+                        className={`flex flex-col items-center justify-center p-4 border rounded-xl transition-all duration-300 transform hover:scale-105 ${
+                          data.status === status
+                            ? status === 'draft' 
+                              ? 'border-yellow-500 bg-gradient-to-br from-yellow-50 to-amber-50 text-yellow-700 shadow-md'
+                              : 'border-green-500 bg-gradient-to-br from-green-50 to-emerald-50 text-green-700 shadow-md'
+                            : 'border-gray-300/50 bg-gray-50/30 hover:bg-gray-100/50 text-gray-700'
+                        }`}
+                        disabled={isLoading}
+                      >
+                        <div className={`mb-2 ${status === 'draft' ? 'text-yellow-600' : 'text-green-600'}`}>
+                          {getStatusIcon(status)}
+                        </div>
+                        <span className="font-medium">{status}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                
                 {/* Upload Progress */}
                 {isLoading && (
                   <div className="mb-8">
@@ -473,7 +555,7 @@ const Page = () => {
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
                           <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clipRule="evenodd" />
                         </svg>
-                        Publish Blog
+                        {data.status === 'Published' ? 'Publish Blog' : 'Save as Draft'}
                       </div>
                     )}
                   </button>

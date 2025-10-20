@@ -14,7 +14,7 @@ const BlogTableItem = ({authorImg,title,data,author}) => {
 
             </td>
             <td className='px-6 pr-4'>
-                {"12 /34 /4"} 
+                {data} 
 
             </td>
         </tr >

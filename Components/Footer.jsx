@@ -1,4 +1,4 @@
-import { assets } from '@/Asstes/assets';
+import { assets } from '/Asstes/assets';
 import Image from 'next/image';
 import React from 'react';
 

@@ -1,31 +1,102 @@
+// Page.js (Blog Detail Page)
 'use client'
+import { CiFacebook } from "react-icons/ci";
+import { FaLinkedin } from "react-icons/fa6";
+import { FaFacebookMessenger } from "react-icons/fa";
+import { FaEdit, FaTrash } from "react-icons/fa"; // আইকন ইমপোর্ট করুন
 
-import { assets } from '@/Asstes/assets';
-import Footer from '@/Components/Footer';
+import { usePathname, useRouter } from 'next/navigation';
+
+import { assets } from '/Asstes/assets';
+import Footer from '/Components/Footer';
 import Image from 'next/image';
 import Link from 'next/link';
 import React, { use, useEffect, useState } from 'react';
 import axios from 'axios';
+import { useAuth } from '/lib/AuthContext'; // AuthContext ইমপোর্ট করুন
+import { toast } from "react-toastify";
+
+// টুলস ফাংশনগুলো কম্পোনেন্টের বাইরে রাখা
+const calculateReadingTime = (html) => {
+  if (!html) return 0;
+
+  // HTML ট্যাগ বাদ দিয়ে শুধু টেক্সট বের করা
+  const text = html.replace(/<[^>]+>/g, '');
+  const wordCount = text.trim().split(/\s+/).length;
+
+  // সময় মিনিটে (wordCount ÷ 200)
+  const minutes = Math.ceil(wordCount / 200);
+  return minutes;
+};
 
 const Page = ({ params }) => {
+    const pathname = usePathname();
+    const router = useRouter();
+    const [readingTime, setReadingTime] = useState(0);
     const { id } = use(params);
     const [data, setData] = useState(null);
     const [relatedPosts, setRelatedPosts] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [comments, setComments] = useState([
-        { id: 1, name: "Alex Johnson", text: "Great article! Really helped me understand the topic better.", time: "2 hours ago" },
-        { id: 2, name: "Sarah Williams", text: "I've been looking for this information everywhere. Thank you for sharing!", time: "1 day ago" },
-        { id: 3, name: "Michael Chen", text: "The step-by-step approach makes it so easy to follow. Excellent work!", time: "3 days ago" }
-    ]);
+    const [comments, setComments] = useState([]);
     const [newComment, setNewComment] = useState("");
+    const [pendingComment, setPendingComment] = useState(""); // পেন্ডিং কমেন্ট স্টেট
+    const [editingCommentId, setEditingCommentId] = useState(null); // যে কমেন্ট এডিট হচ্ছে তার ID
+    const [editCommentText, setEditCommentText] = useState(""); // এডিট করা কমেন্ট টেক্সট
+    
+    // AuthContext থেকে ইউজার এবং ফাংশনগুলি নিন
+    const { user, login, logout, loading: authLoading } = useAuth();
 
+    // পেন্ডিং কমেন্ট চেক করার ফাংশন
+    useEffect(() => {
+        const savedComment = localStorage.getItem('pendingComment');
+        if (savedComment && user) {
+            // কমেন্ট যোগ করা
+            handleAddCommentDirectly(savedComment);
+            localStorage.removeItem('pendingComment');
+            setPendingComment("");
+        }
+    }, [user]);
+
+    // কমেন্ট ফেচ করার ফাংশন
+    const fetchComments = async () => {
+        try {
+            const response = await axios.get(`/api/blog/comment/${id}`);
+            if (response.data.success) {
+                // Format comments for display
+                const formattedComments = response.data.comments.map(comment => ({
+                    id: comment._id,
+                    name: comment.name,
+                    email: comment.email,
+                    text: comment.text,
+                    time: new Date(comment.createdAt).toLocaleString()
+                }));
+                setComments(formattedComments);
+            }
+        } catch (error) {
+            console.error("Error fetching comments:", error);
+        }
+    };
+
+    // ব্লগ ডেটা ফেচ করার useEffect
     useEffect(() => {
         const fetchBlog = async () => {
             try {
                 setLoading(true);
+                console.log("Fetching blog with ID:", id);
+                
                 // নির্দিষ্ট ব্লগ ডেটা ফেচ করুন
                 const response = await axios.get(`/api/blog/${id}`);
-                setData(response.data.blog);
+                console.log("Blog response:", response.data);
+                
+                if (response.data.success) {
+                    setData(response.data.blog);
+                } else {
+                    console.error("Blog fetch failed:", response.data.error);
+                    toast.error(response.data.error || "Failed to fetch blog");
+                }
+                
+                // কমেন্ট ফেচ করুন
+                await fetchComments();
                 
                 // সম্পর্কিত পোস্ট ফেচ করুন
                 const allBlogsResponse = await axios.get('/api/blog');
@@ -34,30 +105,271 @@ const Page = ({ params }) => {
                 setRelatedPosts(related);
             } catch (error) {
                 console.error("Error fetching blog:", error);
+                
+                if (error.response) {
+                    console.error("Error response:", error.response.data);
+                    toast.error(error.response.data.error || "Failed to fetch blog");
+                } else if (error.request) {
+                    console.error("Error request:", error.request);
+                    toast.error("Network error. Please check your connection.");
+                } else {
+                    console.error("Error message:", error.message);
+                    toast.error("Failed to fetch blog");
+                }
             } finally {
                 setLoading(false);
             }
         };
 
         fetchBlog();
-    }, [id]); 
+    }, [id]);
 
-    const handleAddComment = (e) => {
-        e.preventDefault();
-        if (newComment.trim() === '') return;
+    // রিডিং টাইম ক্যালকুলেশনের useEffect
+    useEffect(() => {
+      if (data?.description) {
+        const time = calculateReadingTime(data.description);
+        setReadingTime(time);
+      }
+    }, [data]);
+
+    // কমেন্ট MongoDB এ সেভ করার ফাংশন
+    const saveCommentToMongoDB = async (commentData) => {
+        try {
+            // Fixed: Include blog ID in the URL path
+            const response = await axios.post(`/api/blog/comment/${id}`, commentData);
+            
+            if (response.data.success) {
+                console.log("Comment saved to MongoDB:", response.data);
+                return true;
+            } else {
+                console.error("Failed to save comment:", response.data.error);
+                return false;
+            }
+        } catch (error) {
+            console.error("Error saving comment to MongoDB:", error);
+            return false;
+        }
+    };
+
+    // কমেন্ট আপডেট করার ফাংশন
+    const updateCommentInMongoDB = async (id, updatedText) => {
+        try {
+            const response = await axios.put(`/api/blog/comment/${id}`, {
+                text: updatedText
+            });
+            
+            if (response.data.success) {
+                console.log("Comment updated in MongoDB:", response.data);
+                return true;
+            } else {
+                console.error("Failed to update comment:", response.data.error);
+                return false;
+            }
+        } catch (error) {
+            console.error("Error updating comment in MongoDB:", error);
+            return false;
+        }
+    };
+
+    // কমেন্ট ডিলিট করার ফাংশন
+    const deleteCommentFromMongoDB = async (id) => {
+        try {
+            const response = await axios.delete(`/api/blog/comment/${id}`);
+            
+            if (response.data.success) {
+                console.log("Comment deleted from MongoDB:", response.data);
+                return true;
+            } else {
+                console.error("Failed to delete comment:", response.data.error);
+                return false;
+            }
+        } catch (error) {
+            console.error("Error deleting comment from MongoDB:", error);
+            return false;
+        }
+    };
+
+    // সরাসরি কমেন্ট যোগ করার ফাংশন
+    const handleAddCommentDirectly = async (commentText) => {
+        if (commentText.trim() === '') return;
         
+        // লগইন থাকলে কমেন্ট ডেটা তৈরি করুন - ইউজারের আসল তথ্য ব্যবহার করে
+        const commentData = {
+            name: user.name,      // লগইন করা ইউজারের নাম
+            email: user.email,    // লগইন করা ইউজারের ইমেল
+            text: commentText
+        };
+        
+        // MongoDB এ কমেন্ট সেভ করুন
+        const savedToMongoDB = await saveCommentToMongoDB(commentData);
+        
+        // লোকাল স্টেট আপডেট করুন
         const comment = {
             id: comments.length + 1,
-            name: "You",
-            text: newComment,
+            ...commentData,
             time: "Just now"
         };
         
         setComments([comment, ...comments]);
+        
+        // ইউজারকে অবহিত করুন যে কমেন্ট সফলভাবে সেভ হয়েছে - টোস্ট নোটিফিকেশন দিয়ে
+        if (savedToMongoDB) {
+            toast.success(`Comment posted successfully by ${user.name} (${user.email})!`, {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+                progress: undefined,
+            });
+        } else {
+            toast.error("Comment posted but failed to save to database. Please try again later.", {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+                progress: undefined,
+            });
+        }
+    };
+
+    const handleAddComment = async (e) => {
+        e.preventDefault();
+        if (newComment.trim() === '') return;
+        
+        // চেক করুন ইউজার লগইন আছে কিনা
+        if (!user) {
+            // পেন্ডিং কমেন্ট সেভ করুন
+            localStorage.setItem('pendingComment', newComment);
+            setPendingComment(newComment);
+            
+            // লগইন পেজে রিডাইরেক্ট করুন
+            router.push('/login');
+            return;
+        }
+        
+        // সরাসরি কমেন্ট যোগ করুন
+        await handleAddCommentDirectly(newComment);
         setNewComment("");
     };
 
-    if (loading) {
+    // কমেন্ট এডিট শুরু করার ফাংশন
+    const startEditComment = (comment) => {
+        setEditingCommentId(comment.id);
+        setEditCommentText(comment.text);
+    };
+
+    // কমেন্ট এডিট বাতিল করার ফাংশন
+    const cancelEditComment = () => {
+        setEditingCommentId(null);
+        setEditCommentText("");
+    };
+
+    // কমেন্ট আপডেট সাবমিট করার ফাংশন
+    const handleUpdateComment = async (e) => {
+        e.preventDefault();
+        if (editCommentText.trim() === '') return;
+        
+        // MongoDB এ কমেন্ট আপডেট করুন
+        const updated = await updateCommentInMongoDB(editingCommentId, editCommentText);
+        
+        if (updated) {
+            // লোকাল স্টেট আপডেট করুন
+            setComments(comments.map(comment => 
+                comment.id === editingCommentId 
+                    ? { ...comment, text: editCommentText } 
+                    : comment
+            ));
+            
+            // এডিট মোড বন্ধ করুন
+            setEditingCommentId(null);
+            setEditCommentText("");
+            
+            toast.success("Comment updated successfully!", {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+                progress: undefined,
+            });
+        } else {
+            toast.error("Failed to update comment. Please try again later.", {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+                progress: undefined,
+            });
+        }
+    };
+
+    // কমেন্ট ডিলিট করার ফাংশন
+    const handleDeleteComment = async (commentId) => {
+       
+        
+        // MongoDB থেকে কমেন্ট ডিলিট করুন
+        const deleted = await deleteCommentFromMongoDB(commentId);
+        
+        if (deleted) {
+            // লোকাল স্টেট আপডেট করুন
+            setComments(comments.filter(comment => comment.id !== commentId));
+            
+            toast.success("Comment deleted successfully!", {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+                progress: undefined,
+            });
+        } else {
+            toast.error("Failed to delete comment. Please try again later.", {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: true,
+                pauseOnHover: true,
+                draggable: true,
+                progress: undefined,
+            });
+        }
+    };
+
+    // চেক করুন ইউজার কমেন্ট এডিট/ডিলিট করতে পারবে কিনা
+// চেক করুন ইউজার কমেন্ট ডিলিট করতে পারবে কিনা (মালিক বা অ্যাডমিন)
+const canDeleteComment = (comment) => {
+    // যদি ইউজার লগইন আছে এবং কমেন্টের মালিক হয়
+    if (user && user.email === comment.email) {
+        return true;
+    }
+    
+    // যদি ইউজার অ্যাডমিন হয়
+    if (user && user.role === 'ADMIN') {
+        return true;
+    }
+    
+    return false;
+};
+
+// চেক করুন ইউজার কমেন্ট এডিট করতে পারবে কিনা (শুধুমাত্র মালিক)
+const canEditComment = (comment) => {
+    // যদি ইউজার লগইন আছে এবং কমেন্টের মালিক হয়
+    if (user && user.email === comment.email) {
+        return true;
+    }
+    
+    return false;
+};
+    // লোডিং স্টেট চেক করুন
+    if (loading || authLoading) {
         return (
             <div className="min-h-screen flex justify-center items-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-600"></div>
@@ -78,6 +390,11 @@ const Page = ({ params }) => {
         );
     }
 
+    const currentURL = `https://yourwebsite.com${pathname}`; // ✅ ডাইনামিক কারেন্ট পেজ URL
+    const facebookShare = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(currentURL)}`;
+    const linkedinShare = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(currentURL)}`;
+    const messengerShare = `https://www.facebook.com/dialog/send?link=${encodeURIComponent(currentURL)}&app_id=123456789&redirect_uri=${encodeURIComponent(currentURL)}`;
+
     return (
         <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
             {/* Header */}
@@ -85,12 +402,40 @@ const Page = ({ params }) => {
                 <div className='flex justify-between items-center'>
                     <Link href={'/'} className="flex items-center space-x-2">
                         <Image src={assets.logo} width={180} alt='' className='w-[130px] sm:w-auto'/>
-                        
                     </Link>
-                    <button className='flex items-center gap-2 font-medium py-2 px-4 sm:py-3 sm:px-6 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-all shadow-lg hover:shadow-indigo-200'>
-                        Get Started 
-                        <Image src={assets.arrow} alt='' className='w-4 h-4'/>
-                    </button>
+                    
+                    {/* লগইন/লগআউট বাটন */}
+                    <div className="flex items-center space-x-4">
+                        {user ? (
+                            <>
+                                <div className="flex items-center sm:hidden space-x-2">
+                                    {user?.avatar && (
+                                        <Image 
+                                            src={user.avatar} 
+                                            width={32} 
+                                            height={32} 
+                                            alt={user.name}
+                                            className="rounded-full"
+                                        />
+                                    )}
+                                    <span className="text-gray-700 sm:hidden">{user?.name}!</span>
+                                </div>
+                                <button 
+                                    onClick={logout} // AuthContext থেকে logout ফাংশন ব্যবহার করুন
+                                    className='flex items-center gap-2 font-medium py-2 px-4 sm:py-3 sm:px-6 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all'
+                                >
+                                    Logout
+                                </button>
+                            </>
+                        ) : (
+                            <button 
+                                onClick={() => router.push('/login')} // লগইন পেজে রিডাইরেক্ট করুন
+                                className='flex items-center gap-2 font-medium py-2 px-4 sm:py-3 sm:px-6 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-all shadow-lg hover:shadow-indigo-200'
+                            >
+                                Login
+                            </button>
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -105,34 +450,35 @@ const Page = ({ params }) => {
                         {data.title}
                     </h1>
                     
-                    <div className='flex flex-col sm:flex-row items-center justify-center gap-4 mb-8'>
+                    <div className='flex flex-col sm:flex-row items-center justify-center gap-10 mb-8'>
                         <div className='flex items-center space-x-3'>
-                            <Image 
-                                className='border-2 border-white rounded-full shadow-md' 
-                                src={data.authorImg} // এখানে author ফিল্ড ব্যবহার করুন
-                                width={60} 
-                                height={60} 
-                                alt=''
-                            />
+                            <div className="relative w-12 h-12 rounded-full overflow-hidden border-2 border-white shadow-md">
+                                <Image 
+                                    className='w-full h-full object-cover' 
+                                    src={data.authorImg} 
+                                    alt=''
+                                    fill
+                                />
+                            </div>
                             <div className="text-left">
-                                <p className='font-semibold text-gray-900'>{data.author}</p> {/* এখানে authorImg ফিল্ড ব্যবহার করুন */}
+                                <p className='font-semibold text-gray-900'>{data.author}</p>
                                 <p className='text-sm text-gray-600'>Published on {new Date(data.createdAt).toLocaleDateString()}</p>
                             </div>
                         </div>
                         
-                        <div className="flex items-center space-x-4 text-sm text-gray-600">
+                        <div className="flex flex-col space-x-4 text-sm text-gray-600">
                             <div className="flex items-center">
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
-                                5 min read
+                                It will take <span className='text-[20px] font-medium mx-2'>{readingTime}</span> minutes to finish.
                             </div>
                             <div className="flex items-center">
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                 </svg>
-                                1.2K views
+                                {data.views || 0} views
                             </div>
                         </div>
                     </div>
@@ -157,39 +503,39 @@ const Page = ({ params }) => {
                         
                         <div className='bg-white rounded-2xl shadow-lg p-6 md:p-8 mb-8'>
                             <div className="prose prose-lg max-w-none">
-                                <h1 className='text-2xl font-bold text-gray-900 mb-6 pb-2 border-b border-gray-200'>Introduction</h1>
-                                <p className='text-gray-700 mb-6 leading-relaxed'>{data.description}</p>
-                                
-                                <h2 className='text-xl font-semibold text-gray-900 mt-8 mb-4'>Step 1: Self-Reflection and Goal Setting</h2>
-                                <p className='text-gray-700 mb-4 leading-relaxed'>Lorem ipsum dolor sit amet, consectetur adipisicing elit. Deleniti laborum rem reprehenderit modi architecto est nulla, cumque e</p>
-                                <p className='text-gray-700 mb-6 leading-relaxed'>Lorem ipsum dolor sit amet, consectetur adipisicing elit. Deleniti laborum rem reprehenderit modi architecto est nulla, cumque e</p>
-                                
-                                <h2 className='text-xl font-semibold text-gray-900 mt-8 mb-4'>Step 2: Implementation and Execution</h2>
-                                <p className='text-gray-700 mb-4 leading-relaxed'>Lorem ipsum dolor sit amet, consectetur adipisicing elit. Deleniti laborum rem reprehenderit modi architecto est nulla, cumque e</p>
-                                <p className='text-gray-700 mb-6 leading-relaxed'>Lorem ipsum dolor sit amet, consectetur adipisicing elit. Deleniti laborum rem reprehenderit modi architecto est nulla, cumque e</p>
-                                
-                                <h2 className='text-xl font-semibold text-gray-900 mt-8 mb-4'>Conclusion</h2>
-                                <p className='text-gray-700 mb-6 leading-relaxed'>Lorem ipsum dolor sit amet, consectetur adipisicing elit. Deleniti laborum rem reprehenderit modi architecto est nulla, cumque e</p>
+                                <div className='blog-content' dangerouslySetInnerHTML={{__html:data.description}}></div>
                             </div>
                         </div>
                         
                         {/* Social Sharing */}
                         <div className='bg-white rounded-2xl shadow-lg p-6 mb-8'>
                             <h3 className='text-lg font-semibold text-gray-900 mb-4'>Share this article</h3>
-                            <div className='flex space-x-4'>
-                                <a href="#" className='bg-blue-600 hover:bg-blue-700 text-white p-3 rounded-full transition-colors'>
-                                    <Image src={assets.facebook_icon} width={24} alt='' className='brightness-0 invert'/>
+                            <div className='flex space-x-4 text-3xl'>
+                                <a
+                                    href={facebookShare}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-blue-600 hover:text-blue-800"
+                                >
+                                    <CiFacebook />
                                 </a>
-                                <a href="#" className='bg-blue-400 hover:bg-blue-500 text-white p-3 rounded-full transition-colors'>
-                                    <Image src={assets.twitter_icon} width={24} alt='' className='brightness-0 invert'/>
+
+                                <a
+                                    href={linkedinShare}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-blue-500 hover:text-blue-700"
+                                >
+                                    <FaLinkedin />
                                 </a>
-                                <a href="#" className='bg-red-600 hover:bg-red-700 text-white p-3 rounded-full transition-colors'>
-                                    <Image src={assets.googleplus_icon} width={24} alt='' className='brightness-0 invert'/>
-                                </a>
-                                <a href="#" className='bg-gray-800 hover:bg-gray-900 text-white p-3 rounded-full transition-colors'>
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                                    </svg>
+
+                                <a
+                                    href={messengerShare}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-blue-600 hover:text-blue-800"
+                                >
+                                    <FaFacebookMessenger />
                                 </a>
                             </div>
                         </div>
@@ -198,13 +544,23 @@ const Page = ({ params }) => {
                         <div className='bg-white rounded-2xl shadow-lg p-6'>
                             <h3 className='text-xl font-semibold text-gray-900 mb-6'>Comments ({comments.length})</h3>
                             
-                            {/* Comment Form */}
+                            {/* কমেন্ট ফর্ম - সবার জন্য */}
                             <form onSubmit={handleAddComment} className='mb-8'>
                                 <div className='flex items-start space-x-4'>
                                     <div className='flex-shrink-0'>
-                                        <div className='w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center'>
-                                            <span className='text-indigo-800 font-bold'>Y</span>
-                                        </div>
+                                        {user?.avatar ? (
+                                            <Image 
+                                                src={user.avatar} 
+                                                width={40} 
+                                                height={40} 
+                                                alt={user.name}
+                                                className="w-10 h-10 rounded-full"
+                                            />
+                                        ) : (
+                                            <div className='w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center'>
+                                                <span className='text-indigo-800 font-bold'>Y</span>
+                                            </div>
+                                        )}
                                     </div>
                                     <div className='flex-grow'>
                                         <textarea 
@@ -222,28 +578,99 @@ const Page = ({ params }) => {
                                                 Post Comment
                                             </button>
                                         </div>
+                                        {!user && (
+                                            <p className="text-sm text-gray-500 mt-2">
+                                                You need to login to post a comment. Your comment will be saved and posted after login.
+                                            </p>
+                                        )}
                                     </div>
                                 </div>
                             </form>
                             
-                            {/* Comments List */}
-                            <div className='space-y-6'>
-                                {comments.map(comment => (
-                                    <div key={comment.id} className='flex items-start space-x-4'>
-                                        <div className='flex-shrink-0'>
-                                            <div className='w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center'>
-                                                <span className='text-indigo-800 font-bold'>{comment.name.charAt(0)}</span>
+                            {/* Comments List - Scrollable */}
+                            <div className='max-h-[400px] overflow-y-auto pr-2 border border-gray-200 rounded-lg p-4'>
+                                <div className='space-y-6'>
+                                    {comments.length > 0 ? (
+                                        comments.map(comment => (
+                                            <div key={comment.id} className='flex items-start space-x-4'>
+                                                <div className='flex-shrink-0'>
+                                                    <div className='w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center'>
+                                                        <span className='text-indigo-800 font-bold'>{comment.name.charAt(0)}</span>
+                                                    </div>
+                                                </div>
+                                                <div className='flex-grow'>
+                                                    <div className='flex items-center justify-between mb-1'>
+                                                        <div className='flex items-center space-x-2'>
+                                                            <h4 className='font-semibold text-gray-900'>{comment.name}</h4>
+                                                            {comment.email && (
+                                                                <span className='text-xs text-gray-500'>({comment.email})</span>
+                                                            )}
+                                                            <span className='text-sm text-gray-500'>• {comment.time}</span>
+                                                        </div>
+                                                        
+                                                        {/* এডিট/ডিলিট বাটন - শুধুমাত্র কমেন্টের মালিক বা অ্যাডমিন দেখতে পাবে */}
+                                                   
+                                                         {/* এডিট/ডিলিট বাটন */}
+<div className='flex space-x-2'>
+    {/* এডিট বাটন - শুধুমাত্র কমেন্টের মালিক দেখতে পাবে */}
+    {canEditComment(comment) && (
+        <button 
+            onClick={() => startEditComment(comment)}
+            className='text-blue-500 hover:text-blue-700'
+            title='Edit comment'
+        >
+            <FaEdit />
+        </button>
+    )}
+    
+    {/* ডিলিট বাটন - কমেন্টের মালিক বা অ্যাডমিন দেখতে পাবে */}
+    {canDeleteComment(comment) && (
+        <button 
+            onClick={() => handleDeleteComment(comment.id)}
+            className='text-red-500 hover:text-red-700'
+            title='Delete comment'
+        >
+            <FaTrash />
+        </button>
+    )}
+</div>
+                                                   
+                                                    </div>
+                                                    
+                                                    {/* এডিট মোড */}
+                                                    {editingCommentId === comment.id ? (
+                                                        <div className='mt-2'>
+                                                            <textarea 
+                                                                value={editCommentText}
+                                                                onChange={(e) => setEditCommentText(e.target.value)}
+                                                                className='w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500'
+                                                                rows={3}
+                                                            ></textarea>
+                                                            <div className='mt-2 flex justify-end space-x-2'>
+                                                                <button 
+                                                                    onClick={cancelEditComment}
+                                                                    className='px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300'
+                                                                >
+                                                                    Cancel
+                                                                </button>
+                                                                <button 
+                                                                    onClick={handleUpdateComment}
+                                                                    className='px-3 py-1 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700'
+                                                                >
+                                                                    Save
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <p className='text-gray-700'>{comment.text}</p>
+                                                    )}
+                                                </div>
                                             </div>
-                                        </div>
-                                        <div className='flex-grow'>
-                                            <div className='flex items-center space-x-2 mb-1'>
-                                                <h4 className='font-semibold text-gray-900'>{comment.name}</h4>
-                                                <span className='text-sm text-gray-500'>{comment.time}</span>
-                                            </div>
-                                            <p className='text-gray-700'>{comment.text}</p>
-                                        </div>
-                                    </div>
-                                ))}
+                                        ))
+                                    ) : (
+                                        <p className="text-center text-gray-500 py-4">No comments yet. Be the first to comment!</p>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -255,12 +682,12 @@ const Page = ({ params }) => {
                             <div className='text-center mb-6'>
                                 <Image 
                                     className='mx-auto border-4 border-white rounded-full shadow-md mb-4' 
-                                    src={data.authorImg} // এখানে author ফিল্ড ব্যবহার করুন
+                                    src={data.authorImg} 
                                     width={100} 
                                     height={100} 
                                     alt=''
                                 />
-                                <h3 className='text-xl font-bold text-gray-900 mb-1'>{data.author}</h3> {/* এখানে authorImg ফিল্ড ব্যবহার করুন */}
+                                <h3 className='text-xl font-bold text-gray-900 mb-1'>{data.author}</h3>
                                 <p className='text-gray-600 mb-4'>Content Writer & Blogger</p>
                                 <button className='bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-6 rounded-lg transition-colors w-full'>
                                     Follow

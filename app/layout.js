@@ -1,13 +1,14 @@
 import { Outfit } from "next/font/google";
 import "./globals.css";
+import { AuthProvider } from "/lib/AuthContext";
+import { ToastContainer } from "react-toastify";
+// Fixed import path and named import
 
 const outFit = Outfit({
   // variable: "--font-geist-sans",
   subsets: ["latin"],
   weight:['400','500','600','700']
 });
-
-
 
 export const metadata = {
   title: "Blog App",
@@ -20,7 +21,21 @@ export default function RootLayout({ children }) {
       <body
         className={`${outFit.variable} antialiased`}
       >
-        {children}
+        <ToastContainer
+          position="top-right"
+          autoClose={5000}
+          hideProgressBar={false}
+          newestOnTop={false}
+          closeOnClick
+          rtl={false}
+          pauseOnFocusLoss
+          draggable
+          pauseOnHover
+          theme="light"
+        />
+        <AuthProvider>
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );

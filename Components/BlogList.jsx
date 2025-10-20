@@ -12,7 +12,6 @@ const BlogList = () => {
     const [loading, setLoading] = useState(true);
     const [blogs, setBlogs] = useState([]);
     
-   
     const fetchBlogs = async () => {
         try {
             setLoading(true);
@@ -37,21 +36,21 @@ const BlogList = () => {
         
         return () => clearTimeout(timer);
     }, [searchTerm]);
-    
 
     const filteredBlogs = useMemo(() => {
         if (blogs.length === 0) return [];
         
-        let result = blogs;
+        // First, filter by status - only show published blogs
+        let result = blogs.filter(item => item.status === 'published');
         
-
+        // Then filter by category if menu is not 'All'
         if (menu !== 'All') {
             result = result.filter(item => 
                 item.category.toLowerCase() === menu.toLowerCase()
             );
         }
         
-     
+        // Then filter by search term
         if (debouncedSearchTerm) {
             const term = debouncedSearchTerm.toLowerCase();
             result = result.filter(item => 
@@ -67,7 +66,6 @@ const BlogList = () => {
         setVisibleBlogs(prev => prev + 3);
     };
 
-   
     useEffect(() => {
         setVisibleBlogs(6);
     }, [menu, debouncedSearchTerm]);
@@ -75,20 +73,18 @@ const BlogList = () => {
     return (
         <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white py-12 px-5 md:px-12 lg:px-28">
             <div className="max-w-7xl mx-auto">
-              
                 <div className="text-center mb-16">
-                    <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">Explore Our Blog</h1>
+                    <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">Published Articles</h1>
                     <p className="text-lg text-gray-600 max-w-2xl mx-auto">
                         Discover the latest insights, trends, and stories from our expert writers
                     </p>
                 </div>
 
-              
                 <div className="max-w-2xl mx-auto mb-12">
                     <div className="relative">
                         <input
                             type="text"
-                            placeholder="Search articles..."
+                            placeholder="Search published articles..."
                             className="w-full py-4 px-6 pr-12 rounded-full border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent shadow-sm"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
@@ -101,7 +97,6 @@ const BlogList = () => {
                     </div>
                 </div>
 
-             
                 <div className="flex flex-wrap justify-center gap-3 mb-16">
                     {['All', 'Technology', 'Startup', 'Lifestyle'].map((category) => (
                         <button
@@ -118,12 +113,11 @@ const BlogList = () => {
                     ))}
                 </div>
 
-              
                 <div className="flex justify-between items-center mb-8">
                     <p className="text-gray-600">
                         {filteredBlogs.length > 0 
-                            ? `Showing ${Math.min(visibleBlogs, filteredBlogs.length)} of ${filteredBlogs.length} articles`
-                            : 'No articles found'
+                            ? `Showing ${Math.min(visibleBlogs, filteredBlogs.length)} of ${filteredBlogs.length} published articles`
+                            : 'No published articles found'
                         }
                     </p>
                     <div className="text-sm text-gray-500">
@@ -133,14 +127,12 @@ const BlogList = () => {
                     </div>
                 </div>
 
-                
                 {loading ? (
                     <div className="flex justify-center items-center h-64">
                         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-600"></div>
                     </div>
                 ) : (
                     <>
-                        
                         {filteredBlogs.length > 0 ? (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                                 {filteredBlogs.slice(0, visibleBlogs).map((item) => (
@@ -152,8 +144,16 @@ const BlogList = () => {
                                             id={item._id} 
                                             image={item.image} 
                                             title={item.title} 
+                                            
+createdAt={item.
+createdAt}
+                                            authorImg={item.authorImg}
+                                            author={item.author}
                                             description={item.description} 
-                                            category={item.category}
+                                            category={item.category} 
+                                            
+views={item.
+views}
                                         />
                                     </div>
                                 ))}
@@ -166,11 +166,11 @@ const BlogList = () => {
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                         </svg>
                                     </div>
-                                    <h3 className="text-xl font-semibold text-gray-900 mb-2">No articles found</h3>
+                                    <h3 className="text-xl font-semibold text-gray-900 mb-2">No published articles found</h3>
                                     <p className="text-gray-600 mb-6">
                                         {searchTerm 
                                             ? `No results for "${searchTerm}". Try a different search term or category.`
-                                            : "There are no articles in this category yet."
+                                            : "There are no published articles in this category yet."
                                         }
                                     </p>
                                     <button 
@@ -186,7 +186,6 @@ const BlogList = () => {
                             </div>
                         )}
 
-                       
                         {visibleBlogs < filteredBlogs.length && (
                             <div className="text-center mt-16">
                                 <button 
