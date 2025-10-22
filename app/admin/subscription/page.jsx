@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { FaTrash, FaEnvelope, FaUserFriends } from "react-icons/fa";
+import { FaTrash, FaEnvelope, FaUserFriends, FaChevronLeft, FaChevronRight } from "react-icons/fa";
 import toast, { Toaster } from 'react-hot-toast';
 import { useAuth } from "/lib/AuthContext";
 import { useRouter } from "next/navigation";
@@ -10,27 +10,31 @@ const SubscribersPage = () => {
   const [loading, setLoading] = useState(true);
   const { user, loadings } = useAuth();
   const router = useRouter();
+  
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [subscribersPerPage, setSubscribersPerPage] = useState(10);
 
-  useEffect(() => {
-    if (!loadings) {
-      // যদি ইউজার না থাকে → login এ পাঠাও
-      if (!user) {
-        router.push("/login");
-      }
-      // যদি ইউজার থাকে কিন্তু অ্যাডমিন না হয় → home এ পাঠাও
-      else if (user.role !== "ADMIN") {
-        router.push("/");
-      }
-    }
-  }, [user, loadings, router]);
+  // useEffect(() => {
+  //   if (!loadings) {
+  //     // যদি ইউজার না থাকে → login এ পাঠাও
+  //     if (!user) {
+  //       router.push("/login");
+  //     }
+  //     // যদি ইউজার থাকে কিন্তু অ্যাডমিন না হয় → home এ পাঠাও
+  //     else if (user.role !== "ADMIN") {
+  //       router.push("/");
+  //     }
+  //   }
+  // }, [user, loadings, router]);
 
-  if (loadings || !user || user.role !== "ADMIN") {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        <p className="text-lg font-semibold">Checking admin access...</p>
-      </div>
-    );
-  }
+  // if (loadings || !user || user.role !== "ADMIN") {
+  //   return (
+  //     <div className="flex justify-center items-center min-h-screen">
+  //       <p className="text-lg font-semibold">Checking admin access...</p>
+  //     </div>
+  //   );
+  // }
 
   useEffect(() => {
     fetch("/api/email")
@@ -82,6 +86,12 @@ const SubscribersPage = () => {
                     if (data.success) {
                       setSubscribers((prev) => prev.filter((item) => item._id !== id));
                       toast.success("Successfully deleted!", { id: loadingToast });
+                      
+                      // If current page becomes empty after deletion and it's not the first page, go to previous page
+                      const totalPages = Math.ceil((subscribers.length - 1) / subscribersPerPage);
+                      if (currentPage > 1 && (subscribers.length - 1) <= (currentPage - 1) * subscribersPerPage) {
+                        setCurrentPage(currentPage - 1);
+                      }
                     } else {
                       toast.error(data.message || "Failed to delete subscriber.", { id: loadingToast });
                     }
@@ -101,6 +111,30 @@ const SubscribersPage = () => {
       duration: Infinity,
       position: 'top-center',
     });
+  };
+
+  // Pagination functions
+  const indexOfLastSubscriber = currentPage * subscribersPerPage;
+  const indexOfFirstSubscriber = indexOfLastSubscriber - subscribersPerPage;
+  const currentSubscribers = subscribers.slice(indexOfFirstSubscriber, indexOfLastSubscriber);
+  const totalPages = Math.ceil(subscribers.length / subscribersPerPage);
+
+  const nextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const prevPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const handleSubscribersPerPageChange = (e) => {
+    const newPerPage = parseInt(e.target.value);
+    setSubscribersPerPage(newPerPage);
+    setCurrentPage(1); // Reset to first page when changing items per page
   };
 
   return (
@@ -168,12 +202,7 @@ const SubscribersPage = () => {
 
         {/* Main Content */}
         <div className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-100">
-          <div className="px-6 py-5 border-b border-gray-100 flex justify-between items-center">
-            <h2 className="text-xl font-semibold text-gray-800">Subscriber List</h2>
-            <div className="text-sm text-gray-500">
-              {subscribers.length} {subscribers.length === 1 ? 'subscriber' : 'subscribers'}
-            </div>
-          </div>
+         
           
           {loading ? (
             <div className="flex flex-col items-center justify-center py-16">
@@ -192,6 +221,21 @@ const SubscribersPage = () => {
             </div>
           ) : (
             <div className="overflow-x-auto">
+                  <div className="flex justify-end items-center p-4 border-b border-gray-200">
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-gray-600">Show:</span>
+                  <select
+                    value={subscribersPerPage}
+                    onChange={handleSubscribersPerPageChange}
+                    className="border border-gray-300 rounded-lg px-3 py-1 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  >
+                    <option value="5">5</option>
+                    <option value="10">10</option>
+                    <option value="20">20</option>
+                    <option value="30">30</option>
+                  </select>
+                </div>
+              </div>
               {/* Desktop Table */}
               <table className="min-w-full divide-y divide-gray-200 hidden md:table">
                 <thead className="bg-gray-50">
@@ -208,7 +252,7 @@ const SubscribersPage = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {subscribers.map((item) => (
+                  {currentSubscribers.map((item) => (
                     <tr key={item._id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-4 whitespace-nowrap flex items-center">
                         <div className="flex-shrink-0 h-10 w-10 flex items-center justify-center rounded-full bg-indigo-100 text-indigo-600">
@@ -246,7 +290,7 @@ const SubscribersPage = () => {
 
               {/* Mobile Card View */}
               <div className="md:hidden space-y-4">
-                {subscribers.map((item) => (
+                {currentSubscribers.map((item) => (
                   <div key={item._id} className="bg-white shadow rounded-lg p-4 border border-gray-100">
                     <div className="flex items-center space-x-3 mb-2">
                       <div className="flex-shrink-0 h-10 w-10 flex items-center justify-center rounded-full bg-indigo-100 text-indigo-600">
@@ -276,6 +320,53 @@ const SubscribersPage = () => {
                   </div>
                 ))}
               </div>
+              
+              {/* Desktop Pagination */}
+              <div className="hidden md:flex justify-between items-center p-4 border-t border-gray-200">
+                <div className="text-sm text-gray-600">
+                  Showing {indexOfFirstSubscriber + 1} to {Math.min(indexOfLastSubscriber, subscribers.length)} of {subscribers.length} entries
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={prevPage}
+                    disabled={currentPage === 1}
+                    className="flex items-center px-3 py-1 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-lg disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed hover:from-indigo-600 hover:to-purple-600 transition-all duration-300 shadow-sm"
+                  >
+                    <FaChevronLeft className="mr-1" /> Prev
+                  </button>
+                  <span className="text-sm text-gray-600 mx-2">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <button
+                    onClick={nextPage}
+                    disabled={currentPage === totalPages}
+                    className="flex items-center px-3 py-1 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-lg disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed hover:from-indigo-600 hover:to-purple-600 transition-all duration-300 shadow-sm"
+                  >
+                    Next <FaChevronRight className="ml-1" />
+                  </button>
+                </div>
+              </div>
+              
+              {/* Mobile Pagination */}
+              <div className="md:hidden flex justify-between items-center mt-6 bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+                <button
+                  onClick={prevPage}
+                  disabled={currentPage === 1}
+                  className="flex items-center px-3 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-lg disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed hover:from-indigo-600 hover:to-purple-600 transition-all duration-300 shadow-sm"
+                >
+                  <FaChevronLeft className="mr-1" /> Prev
+                </button>
+                <p className="text-sm text-gray-600">
+                  Page {currentPage} of {totalPages}
+                </p>
+                <button
+                  onClick={nextPage}
+                  disabled={currentPage === totalPages}
+                  className="flex items-center px-3 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-lg disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed hover:from-indigo-600 hover:to-purple-600 transition-all duration-300 shadow-sm"
+                >
+                  Next <FaChevronRight className="ml-1" />
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -285,6 +376,7 @@ const SubscribersPage = () => {
           <p>Manage your subscribers efficiently. All data is securely stored.</p>
         </div>
       </div>
+       
     </div>
   );
 };

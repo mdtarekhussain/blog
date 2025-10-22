@@ -13,6 +13,7 @@ export default function Layout({ children }) {
     const { user, loading } = useAuth();
     const router = useRouter();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const [isSidebarExpanded, setIsSidebarExpanded] = useState(true); // নতুন স্টেট যোগ করা হয়েছে
 
     const toggleMobileMenu = () => {
         setIsMobileMenuOpen(!isMobileMenuOpen);
@@ -21,6 +22,11 @@ export default function Layout({ children }) {
     // মোবাইল মেনু বন্ধ করার ফাংশন
     const closeMobileMenu = () => {
         setIsMobileMenuOpen(false);
+    };
+
+    // সাইডবার এক্সপান্ড/কম্প্যাক্ট টগল ফাংশন
+    const toggleSidebarExpand = () => {
+        setIsSidebarExpanded(!isSidebarExpanded);
     };
 
     useEffect(() => {
@@ -64,7 +70,12 @@ export default function Layout({ children }) {
     return (
         <div className="flex min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
             <ToastContainer theme="dark" />
-            <Sidebar isMobileMenuOpen={isMobileMenuOpen} toggleMobileMenu={toggleMobileMenu} />
+            <Sidebar 
+                isMobileMenuOpen={isMobileMenuOpen} 
+                toggleMobileMenu={toggleMobileMenu}
+                isExpanded={isSidebarExpanded} // নতুন প্রপস পাঠানো হয়েছে
+                setIsExpanded={setIsSidebarExpanded} // নতুন প্রপস পাঠানো হয়েছে
+            />
 
             {/* মোবাইল ডিভাইসের জন্য মেনু বাটন */}
             <div className="md:hidden fixed top-4 left-4 z-50">
@@ -79,47 +90,17 @@ export default function Layout({ children }) {
             </div>
 
             {/* মূল কনটেন্ট এরিয়া */}
-            <div className={`flex flex-col flex-1 transition-all duration-300 ${isMobileMenuOpen ? 'ml-0' : 'ml-0 md:ml-64'}`}>
-                {/* টপ নেভিগেশন বার */}
-                <div className="bg-white shadow-md rounded-b-xl border-b border-gray-200">
-                    <div className="flex items-center justify-between w-full py-4 px-4 md:px-8">
-                        <div className="flex items-center space-x-3">
-                            <div className="h-8 w-1 bg-indigo-600 rounded-full"></div>
-                            <h3 className="text-xl font-bold text-gray-800 tracking-tight">Admin Panel</h3>
-                        </div>
-                        
-                        <div className="flex items-center space-x-4">
-                            <div className="flex items-center space-x-2">
-                                <div className="relative">
-                                    <Image 
-                                        src={assets.profile_icon} 
-                                        width={40} 
-                                        alt='' 
-                                        className="rounded-full border-2 border-white shadow-md ring-2 ring-indigo-100"
-                                    />
-                                    <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
+            <div className={`flex flex-col flex-1 transition-all duration-300 ${
+                isMobileMenuOpen ? 'ml-0' : 
+                isSidebarExpanded ? 'ml-0 md:ml-72' : 'ml-0 md:ml-20' // কন্ডিশনাল মার্জিন
+            }`}>
+               
                 {/* মূল কনটেন্ট এরিয়া */}
-                <div className="flex-1 overflow-auto p-4 md:p-6">
+                <div className="flex-1 overflow-auto p-2 md:p-6">
                     {children}
                 </div>
                 
-                {/* ফুটার */}
-                <div className="bg-white border-t border-gray-200 py-3 px-4 md:px-8">
-                    <div className="flex flex-col md:flex-row justify-between items-center text-sm text-gray-600">
-                        <div>© {new Date().getFullYear()} Blog Admin Panel. All rights reserved.</div>
-                        <div className="flex space-x-4 mt-2 md:mt-0">
-                            <a href="#" className="text-gray-500 hover:text-indigo-600 transition-colors">Privacy</a>
-                            <a href="#" className="text-gray-500 hover:text-indigo-600 transition-colors">Terms</a>
-                            <a href="#" className="text-gray-500 hover:text-indigo-600 transition-colors">Help</a>
-                        </div>
-                    </div>
-                </div>
+              
             </div>
         </div>
     );

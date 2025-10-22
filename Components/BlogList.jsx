@@ -141,19 +141,15 @@ const BlogList = () => {
                                         className="transform transition-all duration-500 hover:-translate-y-2"
                                     >
                                         <BlogItem 
-                                            id={item._id} 
+                                            id={item._id}
                                             image={item.image} 
                                             title={item.title} 
-                                            
-createdAt={item.
-createdAt}
+                                            createdAt={item.createdAt}
                                             authorImg={item.authorImg}
                                             author={item.author}
                                             description={item.description} 
                                             category={item.category} 
-                                            
-views={item.
-views}
+                                            views={item.views}
                                         />
                                     </div>
                                 ))}

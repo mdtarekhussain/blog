@@ -1,8 +1,11 @@
-import { ObjectId } from 'mongodb'; // ObjectId আমদানি করুন
-import { mongoUrl } from "/lib/mongodb";
+import { ObjectId } from 'mongodb';
+import { NextResponse } from 'next/server';
+import { mongoUrl } from '/lib/mongodb'; // আপনার existing mongoUrl function
+
 export async function GET(request, { params }) {
   try {
-    // নিশ্চিত করুন যে params.id রয়েছে
+    console.log('GET request received with params:', params);
+    
     if (!params.id) {
       return NextResponse.json({ success: false, error: 'Blog ID is missing' }, { status: 400 });
     }
@@ -10,21 +13,26 @@ export async function GET(request, { params }) {
     const db = await mongoUrl();
     const commentsCollection = db.collection('comments');
     
+    console.log('Fetching comments for blogId:', params.id);
     const comments = await commentsCollection
       .find({ blogId: params.id })
       .sort({ createdAt: -1 })
       .toArray();
     
+    console.log('Found comments:', comments.length);
     return NextResponse.json({ success: true, comments });
+    
   } catch (error) {
     console.error('Error fetching comments:', error);
-    return NextResponse.json({ success: false, error: 'Failed to fetch comments' }, { status: 500 });
+    return NextResponse.json({ 
+      success: false, 
+      error: 'Failed to fetch comments'
+    }, { status: 500 });
   }
 }
 
 export async function POST(request, { params }) {
   try {
-    // নিশ্চিত করুন যে params.id রয়েছে
     if (!params.id) {
       return NextResponse.json({ success: false, error: 'Blog ID is missing' }, { status: 400 });
     }
@@ -39,7 +47,7 @@ export async function POST(request, { params }) {
     const commentsCollection = db.collection('comments');
     
     const newComment = {
-      blogId: params.id, // Use the blog ID from the URL params
+      blogId: params.id,
       name,
       email,
       text,
@@ -52,15 +60,18 @@ export async function POST(request, { params }) {
       success: true, 
       comment: { ...newComment, _id: result.insertedId }
     });
+    
   } catch (error) {
     console.error('Error adding comment:', error);
-    return NextResponse.json({ success: false, error: 'Failed to add comment' }, { status: 500 });
+    return NextResponse.json({ 
+      success: false, 
+      error: 'Failed to add comment'
+    }, { status: 500 });
   }
 }
 
 export async function PUT(request, { params }) {
   try {
-    // নিশ্চিত করুন যে params.id রয়েছে
     if (!params.id) {
       return NextResponse.json({ success: false, error: 'Comment ID is missing' }, { status: 400 });
     }
@@ -73,7 +84,6 @@ export async function PUT(request, { params }) {
     const db = await mongoUrl();
     const commentsCollection = db.collection('comments');
 
-    // ObjectId রূপান্তরের আগে বৈধতা যাচাই করুন
     let commentId;
     try {
       commentId = new ObjectId(params.id);
@@ -91,15 +101,18 @@ export async function PUT(request, { params }) {
     }
 
     return NextResponse.json({ success: true });
+    
   } catch (error) {
     console.error('Error updating comment:', error);
-    return NextResponse.json({ success: false, error: 'Failed to update comment' }, { status: 500 });
+    return NextResponse.json({ 
+      success: false, 
+      error: 'Failed to update comment'
+    }, { status: 500 });
   }
 }
 
 export async function DELETE(request, { params }) {
   try {
-    // নিশ্চিত করুন যে params.id রয়েছে
     if (!params.id) {
       return NextResponse.json({ success: false, error: 'Comment ID is missing' }, { status: 400 });
     }
@@ -107,7 +120,6 @@ export async function DELETE(request, { params }) {
     const db = await mongoUrl();
     const commentsCollection = db.collection('comments');
 
-    // ObjectId রূপান্তরের আগে বৈধতা যাচাই করুন
     let commentId;
     try {
       commentId = new ObjectId(params.id);
@@ -122,8 +134,12 @@ export async function DELETE(request, { params }) {
     }
 
     return NextResponse.json({ success: true });
+    
   } catch (error) {
     console.error('Error deleting comment:', error);
-    return NextResponse.json({ success: false, error: 'Failed to delete comment' }, { status: 500 });
+    return NextResponse.json({ 
+      success: false, 
+      error: 'Failed to delete comment'
+    }, { status: 500 });
   }
 }
