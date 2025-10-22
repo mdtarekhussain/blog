@@ -1,3 +1,5 @@
+import { ObjectId } from 'mongodb'; // ObjectId আমদানি করুন
+import { mongoUrl } from "/lib/mongodb";
 export async function GET(request, { params }) {
   try {
     // নিশ্চিত করুন যে params.id রয়েছে
@@ -71,8 +73,16 @@ export async function PUT(request, { params }) {
     const db = await mongoUrl();
     const commentsCollection = db.collection('comments');
 
+    // ObjectId রূপান্তরের আগে বৈধতা যাচাই করুন
+    let commentId;
+    try {
+      commentId = new ObjectId(params.id);
+    } catch (error) {
+      return NextResponse.json({ success: false, error: 'Invalid comment ID format' }, { status: 400 });
+    }
+
     const result = await commentsCollection.updateOne(
-      { _id: new ObjectId(params.id) },
+      { _id: commentId },
       { $set: { text, updatedAt: new Date() } }
     );
 
@@ -97,7 +107,15 @@ export async function DELETE(request, { params }) {
     const db = await mongoUrl();
     const commentsCollection = db.collection('comments');
 
-    const result = await commentsCollection.deleteOne({ _id: new ObjectId(params.id) });
+    // ObjectId রূপান্তরের আগে বৈধতা যাচাই করুন
+    let commentId;
+    try {
+      commentId = new ObjectId(params.id);
+    } catch (error) {
+      return NextResponse.json({ success: false, error: 'Invalid comment ID format' }, { status: 400 });
+    }
+
+    const result = await commentsCollection.deleteOne({ _id: commentId });
 
     if (result.deletedCount === 0) {
       return NextResponse.json({ success: false, error: 'Comment not found' }, { status: 404 });
