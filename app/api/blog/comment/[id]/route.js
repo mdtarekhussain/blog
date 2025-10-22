@@ -1,9 +1,10 @@
-// /app/api/blog/comment/[id]/route.js
-import { NextRequest, NextResponse } from 'next/server';
-import { mongoUrl } from '/lib/mongodb';
-import { ObjectId } from 'mongodb'; 
 export async function GET(request, { params }) {
   try {
+    // নিশ্চিত করুন যে params.id রয়েছে
+    if (!params.id) {
+      return NextResponse.json({ success: false, error: 'Blog ID is missing' }, { status: 400 });
+    }
+    
     const db = await mongoUrl();
     const commentsCollection = db.collection('comments');
     
@@ -21,6 +22,11 @@ export async function GET(request, { params }) {
 
 export async function POST(request, { params }) {
   try {
+    // নিশ্চিত করুন যে params.id রয়েছে
+    if (!params.id) {
+      return NextResponse.json({ success: false, error: 'Blog ID is missing' }, { status: 400 });
+    }
+
     const { name, email, text } = await request.json();
     
     if (!name || !email || !text) {
@@ -50,9 +56,13 @@ export async function POST(request, { params }) {
   }
 }
 
-// কমেন্ট আপডেট করার জন্য PUT মেথড যোগ করুন
 export async function PUT(request, { params }) {
   try {
+    // নিশ্চিত করুন যে params.id রয়েছে
+    if (!params.id) {
+      return NextResponse.json({ success: false, error: 'Comment ID is missing' }, { status: 400 });
+    }
+
     const { text } = await request.json();
     if (!text) {
       return NextResponse.json({ success: false, error: 'Missing comment text' }, { status: 400 });
@@ -76,8 +86,14 @@ export async function PUT(request, { params }) {
     return NextResponse.json({ success: false, error: 'Failed to update comment' }, { status: 500 });
   }
 }
+
 export async function DELETE(request, { params }) {
   try {
+    // নিশ্চিত করুন যে params.id রয়েছে
+    if (!params.id) {
+      return NextResponse.json({ success: false, error: 'Comment ID is missing' }, { status: 400 });
+    }
+
     const db = await mongoUrl();
     const commentsCollection = db.collection('comments');
 
